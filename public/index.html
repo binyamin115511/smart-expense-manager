@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>מנהל הוצאות חכם</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#667eea" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="הוצאות" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ==================== AUTH ==================== -->
+<div id="auth-screen" class="screen active">
+  <div class="auth-card">
+    <div class="logo">💰</div>
+    <h1>מנהל הוצאות חכם</h1>
+    <p class="auth-sub">נהל את הכסף שלך בחכמה</p>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('login')">כניסה</button>
+      <button class="tab" onclick="switchTab('register')">הרשמה</button>
+    </div>
+
+    <div id="login-form">
+      <input type="email" id="login-email" placeholder="אימייל" />
+      <input type="password" id="login-password" placeholder="סיסמה" />
+      <button class="btn-primary" onclick="login()">כניסה</button>
+    </div>
+
+    <div id="register-form" style="display:none">
+      <input type="email" id="reg-email" placeholder="אימייל" />
+      <input type="password" id="reg-password" placeholder="סיסמה" />
+      <button class="btn-primary" onclick="register()">הרשמה חינמית</button>
+    </div>
+
+    <div id="auth-error" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div id="app-screen" class="screen">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">💰 הוצאות חכם</div>
+    <nav>
+      <a class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">🏠</span> דשבורד</a>
+      <a class="nav-item" onclick="showPage('expenses')"><span class="nav-icon">📋</span> הוצאות</a>
+      <a class="nav-item" onclick="showPage('stats')"><span class="nav-icon">📊</span> סטטיסטיקות</a>
+      <a class="nav-item" onclick="showPage('chat')"><span class="nav-icon">🤖</span> צ'אט AI</a>
+      <a class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙️</span> הגדרות</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-info">
+        <span class="user-avatar">👤</span>
+        <span id="user-email-display"></span>
+      </div>
+      <div id="plan-badge" class="plan-badge free">חינמי</div>
+      <button class="btn-logout" onclick="logout()">יציאה</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2 class="page-title">דשבורד</h2>
+        <div id="dash-date" class="dash-date"></div>
+      </div>
+
+      <div class="cards-row">
+        <div class="stat-card blue">
+          <div class="stat-label">סה"כ הוצאות</div>
+          <div class="stat-value" id="dash-total">₪0</div>
+          <div class="stat-sub" id="dash-total-sub"></div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">חודש נוכחי</div>
+          <div class="stat-value" id="dash-month">₪0</div>
+          <div class="stat-trend" id="dash-month-trend"></div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">תקציב חודשי</div>
+          <div class="stat-value" id="dash-budget">₪0</div>
+          <div class="stat-sub" id="dash-budget-sub"></div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">קטגוריה מובילה</div>
+          <div class="stat-value" id="dash-top-cat">—</div>
+          <div class="stat-sub" id="dash-top-cat-sub"></div>
+        </div>
+      </div>
+
+      <!-- Budget progress -->
+      <div class="card">
+        <div class="card-header-row">
+          <h3>שימוש בתקציב החודשי</h3>
+          <span id="budget-pct-label" class="badge"></span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="budget-bar"></div>
+        </div>
+        <div class="progress-label" id="budget-label"></div>
+      </div>
+
+      <!-- Weekly summary -->
+      <div class="card">
+        <h3>סיכום שבועי</h3>
+        <div id="weekly-summary" class="weekly-grid"></div>
+      </div>
+
+      <!-- Insights -->
+      <div class="card">
+        <h3>תובנות חכמות</h3>
+        <div id="insights-list"><div class="loading">טוען...</div></div>
+      </div>
+
+      <!-- Quick add -->
+      <div class="card">
+        <h3>הוספה מהירה</h3>
+        <div class="quick-add-row">
+          <input type="text" id="qa-title" placeholder="כותרת" />
+          <input type="number" id="qa-amount" placeholder="סכום ₪" min="0" />
+          <select id="qa-category">
+            <option value="מזון">🍔 מזון</option>
+            <option value="דלק">⛽ דלק</option>
+            <option value="תחבורה">🚗 תחבורה</option>
+            <option value="קניות">🛍️ קניות</option>
+            <option value="חשבונות">💡 חשבונות</option>
+            <option value="בידור">🎬 בידור</option>
+            <option value="בריאות">💊 בריאות</option>
+            <option value="ביגוד">👕 ביגוד</option>
+            <option value="חינוך">📚 חינוך</option>
+            <option value="מנויים">📱 מנויים</option>
+            <option value="כללי">📦 כללי</option>
+          </select>
+          <button class="btn-primary" onclick="quickAdd()">+ הוסף</button>
+        </div>
+      </div>
+
+      <!-- Recent -->
+      <div class="card">
+        <div class="card-header-row">
+          <h3>הוצאות אחרונות</h3>
+          <button class="btn-link" onclick="showPage('expenses')">הצג הכל ←</button>
+        </div>
+        <div id="recent-expenses-list"></div>
+      </div>
+    </div>
+
+    <!-- ===== EXPENSES ===== -->
+    <div id="page-expenses" class="page">
+      <div class="page-header">
+        <h2 class="page-title">הוצאות</h2>
+        <button class="btn-primary" onclick="openAddModal()">+ הוסף הוצאה</button>
+      </div>
+
+      <div class="card filters-row">
+        <input type="text" id="search-q" placeholder="🔍 חיפוש..." oninput="loadExpenses()" />
+        <select id="filter-cat" onchange="loadExpenses()">
+          <option value="all">כל הקטגוריות</option>
+          <option value="מזון">מזון</option>
+          <option value="דלק">דלק</option>
+          <option value="תחבורה">תחבורה</option>
+          <option value="קניות">קניות</option>
+          <option value="חשבונות">חשבונות</option>
+          <option value="בידור">בידור</option>
+          <option value="בריאות">בריאות</option>
+          <option value="ביגוד">ביגוד</option>
+          <option value="חינוך">חינוך</option>
+          <option value="מנויים">מנויים</option>
+          <option value="כללי">כללי</option>
+        </select>
+        <select id="filter-sort" onchange="loadExpenses()">
+          <option value="date_desc">תאריך: חדש לישן</option>
+          <option value="date_asc">תאריך: ישן לחדש</option>
+          <option value="amount_desc">סכום: גבוה לנמוך</option>
+          <option value="amount_asc">סכום: נמוך לגבוה</option>
+        </select>
+        <input type="date" id="filter-from" onchange="loadExpenses()" />
+        <span style="color:#999">עד</span>
+        <input type="date" id="filter-to" onchange="loadExpenses()" />
+        <button class="btn-secondary" onclick="clearFilters()">נקה</button>
+      </div>
+
+      <div id="expenses-summary-bar" class="expenses-summary-bar"></div>
+      <div id="expenses-list" class="card"><div class="loading">טוען...</div></div>
+    </div>
+
+    <!-- ===== STATS ===== -->
+    <div id="page-stats" class="page">
+      <h2 class="page-title">סטטיסטיקות</h2>
+
+      <div class="charts-grid">
+        <div class="card">
+          <h3>הוצאות לפי קטגוריה</h3>
+          <canvas id="cat-chart"></canvas>
+        </div>
+        <div class="card">
+          <h3>הוצאות יומיות (חודש נוכחי)</h3>
+          <canvas id="daily-chart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>הוצאות לפי חודשים (6 חודשים אחרונים)</h3>
+        <canvas id="monthly-chart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>השוואה חודשית</h3>
+        <div id="month-compare" class="month-compare-grid"></div>
+      </div>
+
+      <div class="card">
+        <h3>מגמות לפי קטגוריה</h3>
+        <div id="trends-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>🤖 דוח AI מלא</h3>
+        <button class="btn-primary" onclick="loadAIReport()" style="width:auto">קבל ניתוח חכם</button>
+        <div id="ai-report-output" style="margin-top:16px; white-space:pre-wrap; line-height:1.8; font-size:14px;"></div>
+      </div>
+    </div>
+
+    <!-- ===== CHAT ===== -->
+    <div id="page-chat" class="page">
+      <h2 class="page-title">🤖 צ'אט AI פיננסי</h2>
+      <div class="card chat-card">
+        <div id="chat-messages" class="chat-messages">
+          <div class="chat-msg bot">
+            <div class="chat-bubble">שלום! אני היועץ הפיננסי האישי שלך 💰<br>שאל אותי כל שאלה על ההוצאות שלך, כמו:<br>• "איך אני יכול לחסוך כסף?"<br>• "למה הוצאתי יותר החודש?"<br>• "מה הקטגוריה הכי יקרה שלי?"</div>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="שאל שאלה..." onkeydown="if(event.key==='Enter') sendChat()" />
+          <button class="btn-primary chat-send" onclick="sendChat()">שלח</button>
+        </div>
+        <div class="chat-suggestions">
+          <button class="suggestion-chip" onclick="askSuggestion('איך אני יכול לחסוך כסף?')">💡 איך לחסוך?</button>
+          <button class="suggestion-chip" onclick="askSuggestion('מה הקטגוריה הכי יקרה שלי?')">📊 קטגוריה יקרה</button>
+          <button class="suggestion-chip" onclick="askSuggestion('תן לי סיכום של ההוצאות שלי')">📋 סיכום הוצאות</button>
+          <button class="suggestion-chip" onclick="askSuggestion('האם אני עומד בתקציב שלי?')">✅ מצב תקציב</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div id="page-settings" class="page">
+      <h2 class="page-title">הגדרות</h2>
+
+      <div class="card">
+        <h3>💰 תקציב חודשי</h3>
+        <p class="setting-desc">קבל התראה כשמגיעים ל-80% ועברת את התקציב</p>
+        <div class="setting-row">
+          <input type="number" id="set-budget" placeholder="סכום תקציב חודשי" min="0" />
+          <button class="btn-primary" onclick="saveBudget()">שמור</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🎯 יעד חיסכון</h3>
+        <p class="setting-desc">הגדר יעד להוצאות כוללות — המערכת תתריע כשחורגים</p>
+        <div class="setting-row">
+          <input type="number" id="set-goal" placeholder="יעד חיסכון" min="0" />
+          <button class="btn-primary" onclick="saveGoal()">שמור</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🍔 תקציב מזון חודשי</h3>
+        <p class="setting-desc">קבל התראה כשהוצאות המזון חורגות מהסכום שהגדרת</p>
+        <div class="setting-row">
+          <input type="number" id="set-food-limit" placeholder="תקציב מזון חודשי" min="0" />
+          <button class="btn-primary" onclick="saveFoodLimit()">שמור</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔔 התראות דפדפן</h3>
+        <p class="setting-desc">אפשר התראות כדי לקבל עדכונים גם כשהחלון ממוזער</p>
+        <div class="setting-row">
+          <button class="btn-primary" id="notif-btn" onclick="requestNotifications()" style="width:auto">אפשר התראות</button>
+          <span id="notif-status" style="font-size:13px; color:#888; margin-right:8px;"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📦 פיצ'רים עתידיים</h3>
+        <div class="future-features">
+          <div class="future-item">🏦 חיבור לבנק <span class="badge-soon">בקרוב</span></div>
+          <div class="future-item">🔄 זיהוי מנויים חוזרים <span class="badge-soon">בקרוב</span></div>
+          <div class="future-item">👨‍👩‍👧 חשבון משפחתי <span class="badge-soon">בקרוב</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>💎 מצב מנוי</h3>
+        <p class="setting-desc">AI וניתוחים מתקדמים זמינים בפרימיום</p>
+        <div class="setting-row">
+          <button class="btn-primary" onclick="togglePlan()">החלף חינמי / פרימיום</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom nav mobile -->
+  <nav class="bottom-nav">
+    <a class="bottom-nav-item active" onclick="showPage('dashboard')">🏠<span>דשבורד</span></a>
+    <a class="bottom-nav-item" onclick="showPage('expenses')">📋<span>הוצאות</span></a>
+    <a class="bottom-nav-item" onclick="showPage('stats')">📊<span>סטטיסטיקות</span></a>
+    <a class="bottom-nav-item" onclick="showPage('chat')">🤖<span>AI</span></a>
+    <a class="bottom-nav-item" onclick="showPage('settings')">⚙️<span>הגדרות</span></a>
+  </nav>
+</div>
+
+<!-- ==================== MODAL ==================== -->
+<div id="expense-modal" class="modal-overlay" style="display:none">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-title">הוסף הוצאה</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <input type="hidden" id="modal-id" />
+    <div class="form-group">
+      <label>כותרת</label>
+      <input type="text" id="modal-expense-title" placeholder="לדוגמה: קניות סופר" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>סכום (₪)</label>
+        <input type="number" id="modal-expense-amount" placeholder="0" min="0" />
+      </div>
+      <div class="form-group">
+        <label>תאריך</label>
+        <input type="date" id="modal-expense-date" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>קטגוריה</label>
+      <div class="category-grid" id="category-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">ביטול</button>
+      <button class="btn-primary" onclick="saveExpense()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
