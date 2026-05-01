@@ -1,4 +1,7 @@
-node_modules/
-data/
+token.json
+credentials.json
 .env
+emails.db
 *.log
+dashboard.html
+__pycache__/

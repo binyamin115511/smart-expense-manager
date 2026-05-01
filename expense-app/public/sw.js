@@ -1,5 +1,5 @@
-const CACHE = "expense-app-v1";
-const STATIC = ["/", "/style.css", "/app.js", "/manifest.json"];
+const CACHE = "expense-app-v3";
+const STATIC = ["/", "/style.css", "/app.js", "/manifest.json", "/offline.html"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
@@ -26,15 +26,24 @@ self.addEventListener("fetch", e => {
       url.pathname.startsWith("/budget") ||
       url.pathname.startsWith("/goal") ||
       url.pathname.startsWith("/foodlimit")) {
+    // For navigation requests when offline, show offline page
+    if (e.request.mode === "navigate") {
+      e.respondWith(caches.match("/offline.html"));
+    }
     return;
   }
 
-  // Static assets — cache first, then network
+  // Static assets — cache first, then network fallback to offline page
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
-      return res;
-    }))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => {
+        if (e.request.mode === "navigate") return caches.match("/offline.html");
+      });
+    })
   );
 });

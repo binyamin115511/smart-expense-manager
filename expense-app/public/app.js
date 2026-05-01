@@ -627,15 +627,19 @@ async function deleteExpense(id) {
 // ========== HELPERS ==========
 async function api(path, method = "GET", body = null) {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
     const opts = {
       method,
+      signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }
     };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(API + path, opts);
+    clearTimeout(timeout);
     return await res.json();
   } catch (e) {
-    console.error("API error:", e);
+    if (e.name === "AbortError") return { error: "השרת לא מגיב — בדוק חיבור" };
     return { error: e.message };
   }
 }
